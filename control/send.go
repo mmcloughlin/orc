@@ -45,10 +45,10 @@ type Cmd struct {
 	Data      string   // will be dot escaped by Send
 }
 
-// Send sends a command to the Tor server.
-func (c Conn) Send(cmd Cmd) (*Reply, error) {
+// SendAsync sends a command to the Tor server without waiting for a reply.
+func (c Conn) SendAsync(cmd Cmd) error {
 	if len(cmd.Keyword) == 0 {
-		return nil, errors.New("empty Keyword in Cmd")
+		return errors.New("empty Keyword in Cmd")
 	}
 	line := cmd.Keyword
 	for _, arg := range cmd.Arguments {
@@ -60,17 +60,26 @@ func (c Conn) Send(cmd Cmd) (*Reply, error) {
 
 	if len(cmd.Data) > 0 {
 		if cmd.Keyword[0] != '+' {
-			return nil, errors.New("protocol error: CmdData present, but Keyword no leading '+;")
+			return errors.New("protocol error: CmdData present, but Keyword no leading '+;")
 		}
 		w := c.text.DotWriter()
 		_, err = w.Write([]byte(cmd.Data))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		w.Close()
 	}
-	reply, err := c.ReceiveSync()
-	return reply, nil
+
+	return nil
+}
+
+// Send sends a command to the Tor server.
+func (c Conn) Send(cmd Cmd) (*Reply, error) {
+	err := c.SendAsync(cmd)
+	if err != nil {
+		return nil, err
+	}
+	return c.ReceiveSync()
 }
 
 // dquote double quotes the string s.
